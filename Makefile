@@ -36,6 +36,7 @@ pyenv: deps  ## Create the pyenv for Python development
 	for dep in $(PYTHON_PACKAGES); do \
 	  if ! echo "$$PIP_FREEZE_OUT" | grep $$dep 2>&1 > /dev/null; then pip install $$dep; fi; \
 	done
+	python -m pip install --upgrade pip
 
 clean:
 	rm -rf downloads/

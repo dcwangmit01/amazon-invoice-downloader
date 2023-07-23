@@ -1,4 +1,6 @@
-#!/usr/bin/env python
+# SPDX-FileCopyrightText: 2023-present David C Wang <dcwangmit01@gmail.com>
+#
+# SPDX-License-Identifier: MIT
 
 """Amazon Invoice Downloader
 
@@ -14,6 +16,8 @@ Arguments:
 Options:
   -h --help     Show this screen.
 """
+
+from amazon_invoice_downloader.__about__ import __version__
 
 from playwright.sync_api import sync_playwright, TimeoutError
 from datetime import datetime
@@ -125,7 +129,8 @@ def amazon_invoice_downloader(playwright, email, password, num_receipts):
     browser.close()
 
 
-if __name__ == "__main__":
+
+def amazon_invoice_downloader():
     arguments = docopt(__doc__)
 
     with sync_playwright() as playwright:
