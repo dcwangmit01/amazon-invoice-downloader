@@ -87,24 +87,27 @@ def run(playwright, args):
     context = browser.new_context()
 
     page = context.new_page()
-    # page.set_default_timeout(10000)
     page.goto("https://www.amazon.com/")
-    page.get_by_role("link", name="Sign in", exact=True).click()
 
-    page.get_by_label("Email").click()
-    page.get_by_label("Email").fill(email)
-    page.get_by_role("button", name="Continue").click()
+    # Sometimes, we are interrupted by a bot check, so let the user solve it
+    page.wait_for_selector('span >> text=Hello, sign in', timeout=0).click()
 
-    page.get_by_label("Password").click()
-    page.get_by_label("Password").fill(password)
-    page.get_by_label("Keep me signed in").check()
-    page.get_by_role("button", name="Sign in").click()
+    if email:
+        page.get_by_label("Email").click()
+        page.get_by_label("Email").fill(email)
+        page.get_by_role("button", name="Continue").click()
 
-    page.get_by_role("link", name="Returns & Orders").click()
+    if password:
+        page.get_by_label("Password").click()
+        page.get_by_label("Password").fill(password)
+        page.get_by_label("Keep me signed in").check()
+        page.get_by_role("button", name="Sign in").click()
+
+    page.wait_for_selector('a >> text=Returns & Orders', timeout=0).click()
     sleep()
 
     # Get a list of years from the select options
-    select = page.query_selector('select[name="orderFilter"]')
+    select = page.query_selector('select#time-filter')
     years = select.inner_text().split("\n")  # skip the first two text options
 
     # Filter years to include only numerical years (YYYY)
@@ -117,7 +120,7 @@ def run(playwright, args):
     # Year Loop (Run backwards through the time range from years to pages to orders)
     for year in years:
         # Select the year in the order filter
-        page.locator("#a-autoid-1-announce").click()  # Time Range Dropdown Filter
+        page.query_selector('span.a-dropdown-container').click()  # Time Range Dropdown Filter
         page.get_by_role("option", name=year).click()  # Select the year (descending order, most recent first)
         sleep()
 
@@ -138,7 +141,7 @@ def run(playwright, args):
                 break
 
             # Order Loop
-            order_cards = page.query_selector_all(".js-order-card")
+            order_cards = page.query_selector_all(".order-card.js-order-card")
             for order_card in order_cards:
                 # Parse the order card to create the date and file_name
                 spans = order_card.query_selector_all("span")
