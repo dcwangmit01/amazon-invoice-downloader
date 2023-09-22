@@ -53,16 +53,10 @@ def run(playwright, args):
     email = args.get('--email')
     if email == '$AMAZON_EMAIL':
         email = os.environ.get('AMAZON_EMAIL')
-    if not email:
-        print("Email must be specified")
-        sys.exit(1)
 
     password = args.get('--password')
     if password == '$AMAZON_PASSWORD':
         password = os.environ.get('AMAZON_PASSWORD')
-    if not password:
-        print("Password must be specified")
-        sys.exit(1)
 
     # Parse date ranges int start_date and end_date
     if args['--date-range']:
@@ -141,7 +135,7 @@ def run(playwright, args):
                 break
 
             # Order Loop
-            order_cards = page.query_selector_all(".order-card.js-order-card")
+            order_cards = page.query_selector_all(".js-order-card")
             for order_card in order_cards:
                 # Parse the order card to create the date and file_name
                 spans = order_card.query_selector_all("span")
