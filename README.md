@@ -34,6 +34,8 @@ playwright install
 
 ## Usage
 
+When running this program, Amazon may detect you are automation and introduce CAPTCHA's or make you login again.  Just do so, and once successfully logged in, the script will continue.
+
 ```console
 $ amazon-invoice-downloader -h
 Amazon Invoice Downloader
