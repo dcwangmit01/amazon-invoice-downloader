@@ -114,8 +114,7 @@ def run(playwright, args):
     # Year Loop (Run backwards through the time range from years to pages to orders)
     for year in years:
         # Select the year in the order filter
-        page.query_selector('span.a-dropdown-container').click()  # Time Range Dropdown Filter
-        page.get_by_role("option", name=year).click()  # Select the year (descending order, most recent first)
+        page.select_option('form[action="/your-orders/orders"] select#time-filter', value=f"year-{year}")
         sleep()
 
         # Page Loop
