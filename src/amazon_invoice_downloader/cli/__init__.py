@@ -95,7 +95,7 @@ def run(playwright, args):
         page.get_by_label("Password").click()
         page.get_by_label("Password").fill(password)
         page.get_by_label("Keep me signed in").check()
-        page.get_by_role("button", name="Sign in").click()
+        page.get_by_role("button", name="Sign in", exact=True).click()
 
     page.wait_for_selector('a >> text=Returns & Orders', timeout=0).click()
     sleep()
