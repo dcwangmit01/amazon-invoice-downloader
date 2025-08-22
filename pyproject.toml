@@ -7,7 +7,7 @@ name = "amazon-invoice-downloader"
 dynamic = ["version"]
 description = 'Logs into an Amazon.com account and downloads invoices as PDF'
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 license = "MIT"
 keywords = ["amazon", "invoice", "statements", "download", "pdf"]
 authors = [
@@ -16,13 +16,12 @@ authors = [
 classifiers = [
   "Development Status :: 4 - Beta",
   "Programming Language :: Python",
-  "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: Implementation :: CPython",
 ]
 dependencies = [
-  "docopt>=0.6.2",
+  "docopt-ng>=0.8.1",
   "playwright>=1.54.0",
   "playwright-stealth>=2.0.0",
   "python-dotenv>=1.0.0",
@@ -57,7 +56,7 @@ cov = [
 ]
 
 [[tool.hatch.envs.all.matrix]]
-python = ["3.11", "3.12", "3.13"]
+python = ["3.12", "3.13"]
 
 [tool.hatch.envs.lint]
 detached = true
@@ -89,7 +88,7 @@ dev-dependencies = [
 ]
 
 [tool.black]
-target-version = ["py311"]
+target-version = ["py312"]
 line-length = 120
 skip-string-normalization = true
 

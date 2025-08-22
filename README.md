@@ -224,7 +224,7 @@ This program is designed to work seamlessly with AI assistants through the Model
 
 ### Prerequisites
 
-- **Python 3.11+**: Required for running the application
+- **Python 3.12+**: Required for running the application
 - **[uv](https://docs.astral.sh/uv/)**: Fast Python package manager (replaces pip/poetry)
 - **[Make](https://www.gnu.org/software/make/)**: For development commands
 - **macOS**: The Makefile is optimized for macOS with Homebrew (Linux users can adapt manually)

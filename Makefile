@@ -2,7 +2,7 @@
 SHELL := /usr/bin/env bash
 
 UNAME_S := $(shell uname -s)
-PYTHON_VERSION := 3.11.2
+PYTHON_VERSION := 3.12
 
 # OSX Brew packages
 BREW_PACKAGES := uv
