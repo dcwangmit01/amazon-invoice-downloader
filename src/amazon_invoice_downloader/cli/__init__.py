@@ -289,7 +289,7 @@ def amazon_invoice_downloader():
     load_env_if_needed()
 
     args = docopt(__doc__)
-    print(args)
+    # print(args)
     if args['--version']:
         print(__version__)
         sys.exit(0)
