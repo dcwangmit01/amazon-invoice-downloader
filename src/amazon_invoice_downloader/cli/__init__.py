@@ -10,6 +10,7 @@ Usage:
     [--email=<email> --password=<password>] \
     [--year=<YYYY> | --date-range=<YYYYMMDD-YYYYMMDD>]
   amazon-invoice-downloader.py (-h | --help)
+  amazon-invoice-downloader.py (-v | --version)
 
 Login Options:
   --email=<email>          Amazon login email  [default: $AMAZON_EMAIL].
@@ -17,26 +18,72 @@ Login Options:
 
 Date Range Options:
   --date-range=<YYYYMMDD-YYYYMMDD>  Start and end date range
-  --year=<YYYY>            Year, formatted as YYYY  [default: <CUR_YEAR>].
+  --year=<YYYY>                     Year, formatted as YYYY  [default: <CUR_YEAR>].
 
 Options:
   -h --help                Show this screen.
+  -v --version             Show version.
 
 Examples:
-  amazon-invoice-downloader.py --year=2022  # This uses env vars $AMAZON_EMAIL and $AMAZON_PASSWORD
+  amazon-invoice-downloader.py --year=2022  # Uses .env file or env vars $AMAZON_EMAIL and $AMAZON_PASSWORD
   amazon-invoice-downloader.py --date-range=20220101-20221231
   amazon-invoice-downloader.py --email=user@example.com --password=secret  # Defaults to current year
   amazon-invoice-downloader.py --email=user@example.com --password=secret --year=2022
   amazon-invoice-downloader.py --email=user@example.com --password=secret --date-range=20220101-20221231
+
+Features:
+  - Remote debugging enabled on port 9222 for AI MCP Servers
+  - Virtual authenticator configured to prevent passkey dialogs
+  - Stealth mode enabled to avoid detection
+
+Credential Precedence:
+  1. Command line arguments (--email, --password)
+  2. Environment variables ($AMAZON_EMAIL, $AMAZON_PASSWORD)
+  3. .env file (automatically loaded if env vars not set)
 """
 
 import os
 import random
+import sys
 import time
 from datetime import datetime
+from pathlib import Path
 
 from docopt import docopt
+from dotenv import load_dotenv
 from playwright.sync_api import TimeoutError, sync_playwright
+from playwright_stealth import Stealth
+
+from ..__about__ import __version__
+
+
+def load_env_if_needed():
+    """Load environment variables from .env file if it exists and variables aren't set."""
+    # Check if Amazon credentials are already set in environment
+    amazon_email = os.environ.get('AMAZON_EMAIL')
+    amazon_password = os.environ.get('AMAZON_PASSWORD')
+
+    # If both are already set, no need to load .env
+    if amazon_email and amazon_password:
+        return
+
+    # Look for .env file in current directory and parent directories
+    current_dir = Path.cwd()
+    env_file = None
+
+    # Check current directory and up to 3 parent directories
+    for i in range(4):
+        check_path = current_dir / '.env'
+        if check_path.exists():
+            env_file = check_path
+            break
+        current_dir = current_dir.parent
+
+    if env_file:
+        print(f"Loading environment variables from {env_file}")
+        load_dotenv(env_file)
+    else:
+        print("No .env file found in current directory or parent directories")
 
 
 def sleep():
@@ -67,33 +114,93 @@ def run(playwright, args):
     start_date = datetime.strptime(start_date, "%Y%m%d")
     end_date = datetime.strptime(end_date, "%Y%m%d")
 
-    # Debug
-    # print(email, password, start_date, end_date)
-
     # Ensure the location exists for where we will save our downloads
     target_dir = os.getcwd() + "/" + "downloads"
     os.makedirs(target_dir, exist_ok=True)
 
     # Create Playwright context with Chromium
-    browser = playwright.chromium.launch(headless=False)
+    # Always use CDP for virtual authenticator and remote debugging
+    print("🚀 Launching Chromium with CDP debugging on port 9222")
+    print("📱 You can connect to this browser at: http://localhost:9222")
+    print("🔗 AI assistant can control this browser instance via CDP")
+
+    # Launch browser with CDP endpoint
+    browser = playwright.chromium.launch(
+        headless=False,
+        args=[
+            '--remote-debugging-port=9222',
+            '--remote-debugging-address=0.0.0.0',
+            '--disable-web-security',
+            '--disable-features=VizDisplayCompositor',
+        ],
+    )
+
+    # Connect to the browser using CDP
+    browser = playwright.chromium.connect_over_cdp("http://localhost:9222")
+
+    # Create context and page
     context = browser.new_context()
-
     page = context.new_page()
-    page.goto("https://www.amazon.com/")
 
-    # Sometimes, we are interrupted by a bot check, so let the user solve it
-    page.wait_for_selector("span >> text=Hello, sign in", timeout=0).click()
+    # Set up virtual authenticator to prevent passkey dialogs
+    print("🔐 Setting up virtual authenticator to disable passkeys")
+    try:
+        client = page.context.new_cdp_session(page)
+        client.send("WebAuthn.enable")
+        client.send(
+            "WebAuthn.addVirtualAuthenticator",
+            {
+                "options": {
+                    "protocol": "ctap2",
+                    "transport": "internal",
+                    "hasResidentKey": True,
+                    "hasUserVerification": True,
+                    "isUserVerified": True,
+                    "automaticPresenceSimulation": True,
+                }
+            },
+        )
+        print("✅ Virtual authenticator configured successfully")
+    except Exception as e:
+        print(f"⚠️ Warning: Could not configure virtual authenticator: {e}")
+
+    Stealth().apply_stealth_sync(page)
+
+    # Wait for page to fully load
+    page.goto("https://amazon.com/")
+    page.wait_for_load_state("domcontentloaded")
+
+    # Check if we're on the less fully featured page
+    test_less_featured_page = page.query_selector('a:has-text("Returns & Orders")')
+    if not test_less_featured_page:
+        print("Less featured page detected, navigating to sign-in...")
+        page.query_selector('a:has-text("Your Account")').click()
+        page.wait_for_load_state("domcontentloaded")
+        sleep()
+
+    page.query_selector('a:has-text("Hello, sign in")').click()
+    page.wait_for_load_state("domcontentloaded")
+    sleep()
 
     if email:
-        page.get_by_label("Email").click()
         page.get_by_label("Email").fill(email)
         page.get_by_role("button", name="Continue").click()
+        page.wait_for_load_state("domcontentloaded")
+        sleep()
 
     if password:
-        page.get_by_label("Password").click()
         page.get_by_label("Password").fill(password)
-        page.get_by_label("Keep me signed in").check()
         page.get_by_role("button", name="Sign in", exact=True).click()
+        page.wait_for_load_state("domcontentloaded")
+        sleep()
+
+    # Check for 2FA page
+    if page.query_selector('title:has-text("Two-Step Verification")'):
+        print("🔐 2FA detected - please complete authentication in browser")
+        while page.query_selector('title:has-text("Two-Step Verification")'):
+            time.sleep(1)
+        print("✅ 2FA completed")
+    page.wait_for_load_state("domcontentloaded")
 
     page.wait_for_selector("a >> text=Returns & Orders", timeout=0).click()
     sleep()
@@ -136,9 +243,16 @@ def run(playwright, args):
             for order_card in order_cards:
                 # Parse the order card to create the date and file_name
                 spans = order_card.query_selector_all("span")
+                # Debug:
+                # for i,s in enumerate(spans): print(i, s.inner_text())
+
+                # Skip cancelled orders
+                if spans[4].inner_text().strip().lower() == "cancelled":
+                    continue
+
                 date = datetime.strptime(spans[1].inner_text(), "%B %d, %Y")
                 total = spans[3].inner_text().replace("$", "").replace(",", "")  # remove dollar sign and commas
-                orderid = spans[9].inner_text()
+                orderid = spans[8].inner_text()
                 date_str = date.strftime("%Y%m%d")
                 file_name = f"{target_dir}/{date_str}_{total}_amazon_{orderid}.pdf"
 
@@ -171,7 +285,14 @@ def run(playwright, args):
 
 
 def amazon_invoice_downloader():
+    # Load environment variables from .env file if needed
+    load_env_if_needed()
+
     args = docopt(__doc__)
+    print(args)
+    if args['--version']:
+        print(__version__)
+        sys.exit(0)
 
     with sync_playwright() as playwright:
         run(playwright, args)

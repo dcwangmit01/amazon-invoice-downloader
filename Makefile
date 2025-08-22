@@ -78,6 +78,8 @@ deps-uv:  ## Create the uv environment for Python development
 	@echo "Installing/updating dependencies with uv..."
 	@uv pip install --upgrade pip
 	@uv sync
+	@echo "Installing Playwright browsers..."
+	@uv run playwright install
 
 .PHONY: check
 check:  ## Auto-check and format via pre-commit. Re-runs automatically if files are modified.

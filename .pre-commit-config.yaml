@@ -18,10 +18,12 @@ repos:
   - id: check-xml
   - id: check-yaml
     args: [--unsafe]
+  # - id: debug-statements
   - id: detect-private-key
   - id: end-of-file-fixer
   - id: mixed-line-ending
     args: [--fix=lf]
+  # - id: no-commit-to-branch
   - id: pretty-format-json
     args: [--autofix, --indent=2, --no-sort-keys]
     exclude: (min.schema.json|.ipynb)$
@@ -33,39 +35,31 @@ repos:
   hooks:
   - id: pretty-format-yaml
     args: [--autofix, --indent, '2']
-
 - repo: https://github.com/mrtazz/checkmake
   rev: 0.2.2
   hooks:
   - id: checkmake
     args: [--config=.checkmake.ini]
-
 - repo: https://github.com/PyCQA/autoflake
   rev: v2.3.1
   hooks:
   - id: autoflake
     args: [-i, --remove-all-unused-imports]
-
 - repo: https://github.com/pycqa/isort
   rev: 6.0.1
   hooks:
   - id: isort
     args: [--profile=black]
-
 - repo: https://github.com/psf/black
   rev: 25.1.0
   hooks:
   - id: black
     args: [--line-length=120, --preview]
-
-
-
-- repo: https://github.com/pre-commit/mirrors-mypy
-  rev: v1.17.1
+- repo: https://github.com/pycqa/flake8
+  rev: 7.3.0
   hooks:
-  - id: mypy
-    args: [--install-types, --non-interactive]
-
+  - id: flake8
+    args: ['--ignore=E226,E501,W503,F541', --max-line-length=120]
 - repo: https://github.com/gitleaks/gitleaks
   rev: v8.27.2
   hooks:
