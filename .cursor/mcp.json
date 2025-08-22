@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "Playwright": {
+      "command": "npx @playwright/mcp@latest",
+      "args": [
+        "--cdp-endpoint=http://localhost:9222"
+      ],
+      "env": {
+        "DEBUG": "pw:mcp"
+      }
+    }
+  }
+}

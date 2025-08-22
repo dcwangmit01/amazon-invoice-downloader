@@ -2,60 +2,115 @@
 SHELL := /usr/bin/env bash
 
 UNAME_S := $(shell uname -s)
-PYENV_NAME := $(notdir $(CURDIR))
 PYTHON_VERSION := 3.11.2
 
-PYTHON_PACKAGES := \
-	pipreqs black flake8 \
-	playwright
+# OSX Brew packages
+BREW_PACKAGES := uv
 
+BREW_CASKS :=
+
+# PRE-COMMIT helpers for formatting and linting
 PYTHON_FILES = $(shell find * -type f -name *.py)
 
-.PHONY: format
-format: deps  ## Auto-format and check pep8
-	  black --line-length 119 $(PYTHON_FILES) && flake8 --max-line-length=119 $(PYTHON_FILES)
+.PHONY: all
+all:  ## Placeholder for all targets, does nothing now
+	:
 
-deps:  ## Ensure OS Dependencies (Only works for MacOS)
+.PHONY: test
+test:  ## Run all tests
+	uv run pytest -v --tb=short --disable-warnings --maxfail=1
+
+.PHONY: format
+format: check  ## Auto-format and check pep8
+
+.PHONY: deps
+deps: deps-os deps-dev deps-uv install-local  ## Ensure OS Dependencies (Only works for MacOS)
+
+.PHONY: deps-os
+deps-os:  ## Ensure OS Dependencies (MacOS only)
 ifeq ($(UNAME_S),Darwin)
-	@# Check only for MacOS
-	@for dep in brew pyenv pyenv-virtualenv; do \
-	  if ! which $$dep 2>&1 > /dev/null; then echo "Please install $$dep"; fi; \
-	done;
+	@echo "Checking macOS dependencies..."
+	@# Check if brew is installed
+	@if ! which brew &> /dev/null; then \
+	  echo "Homebrew is not installed. Please install it from https://brew.sh/ and try again."; \
+	  exit 1; \
+	fi
+
+	@# Check brew-install dependencies
+	@echo "Checking Homebrew packages: $(BREW_PACKAGES)"
+	@for package in $(BREW_PACKAGES); do \
+	  if brew list --versions $$package > /dev/null; then \
+	    echo "$$package is already installed."; \
+	  else \
+	    echo "$$package is not installed. Installing via brew."; \
+	    brew install $$package; \
+	  fi; \
+	done
+	@echo "Checking Homebrew casks: $(BREW_CASKS)"
+	@for cask in $(BREW_CASKS); do \
+	  if brew list --cask --versions $$cask > /dev/null; then \
+	    echo "$$cask is already installed."; \
+	  else \
+	    echo "$$cask is not installed. Installing via brew cask."; \
+	    brew install --cask $$cask; \
+	  fi; \
+	done
+else
+	@echo "Unsupported operating system: $(UNAME_S). This Makefile only supports macOS. Manual dependency installation required."
+	@exit 1
 endif
 
-pyenv: deps  ## Create the pyenv for Python development
-	@if ! pyenv versions | grep $(PYTHON_VERSION) 2>&1 > /dev/null; then \
-	  pyenv install $(PYTHON_VERSION); \
-	fi
-	@if ! pyenv virtualenvs | grep $(PYENV_NAME) 2>&1 > /dev/null; then \
-	  pyenv virtualenv $(PYTHON_VERSION) $(PYENV_NAME); \
-	fi
-	@if ! pyenv local 2>&1 > /dev/null; then \
-	  pyenv local $(PYENV_NAME); \
-	fi
-	@PIP_FREEZE_OUT=$$(pip freeze) && \
-	for dep in $(PYTHON_PACKAGES); do \
-	  if ! echo "$$PIP_FREEZE_OUT" | grep $$dep 2>&1 > /dev/null; then pip install $$dep; fi; \
-	done
-	python -m pip install --upgrade pip
+.PHONY: deps-dev
+deps-dev:  ## Ensure development dependencies
+	uv run pre-commit install
+	uv run pre-commit install-hooks
 
+.PHONY: deps-uv
+deps-uv:  ## Create the uv environment for Python development
+	@if ! which uv &> /dev/null; then \
+	  echo "uv is not installed. Please install it and try again."; \
+	  exit 1; \
+	fi
+	@if [ ! -d .venv ]; then \
+		echo "Creating uv environment in ./.venv with Python $(PYTHON_VERSION)..."; \
+		uv venv -p $(PYTHON_VERSION); \
+	fi
+	@echo "Installing/updating dependencies with uv..."
+	@uv pip install --upgrade pip
+	@uv sync
+
+.PHONY: check
+check:  ## Auto-check and format via pre-commit. Re-runs automatically if files are modified.
+	@uv run --active pre-commit run --all-files || (echo "pre-commit modified files. Running again..." && uv run --active pre-commit run --all-files)
+
+.PHONY: install-local
+install-local:  ## Install the program in the currently active python env
+	uv pip install --editable .
+
+.PHONY: run-local
+run-local:  ## Run the program for this year
+	uv run amazon-invoice-downloader --help
+
+.PHONY: run
 run:  ## Run a few examples
-	hatch run amazon-invoice-downloader --year 2022
-	hatch run amazon-invoice-downloader --date-range 20230131-20221201
-	hatch run amazon-invoice-downloader --email=user@domain.com --password=mypassword
+	uv run amazon-invoice-downloader --year 2024
+	uv run amazon-invoice-downloader --date-range 20230131-20221201
 
+.PHONY: build
 build:  ## Build the project
-	hatch build
+	uv run hatch build
 
+.PHONY: clean
 clean:  ## Clean the project
-	hatch clean
+	uv run hatch clean
+	find . -type d -name __pycache__ -exec rm -rf {} +
+	find . -type f -name "*.pyc" -delete
 
-mrclean: clean  ## Really clean the project and all downloads
-	rm -rf downloads/
+.PHONY: mrclean
+mrclean: clean  ## Really clean the project (except downloads)
+	rm -rf .venv
+	rm -f uv.lock
 
-help:  ## Print list of Makefile targets
-	@# Taken from https://github.com/spf13/hugo/blob/master/Makefile
-	@grep --with-filename -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
-	  cut -d ":" -f2- | \
-	  awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}' | sort
-
+.PHONY: help
+help:  ## Display this help
+	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n\nTargets:\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)

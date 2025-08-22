@@ -30,15 +30,13 @@ Examples:
   amazon-invoice-downloader.py --email=user@example.com --password=secret --date-range=20220101-20221231
 """
 
-from amazon_invoice_downloader.__about__ import __version__
-
-from playwright.sync_api import sync_playwright, TimeoutError
-from datetime import datetime
+import os
 import random
 import time
-import os
-import sys
+from datetime import datetime
+
 from docopt import docopt
+from playwright.sync_api import TimeoutError, sync_playwright
 
 
 def sleep():
@@ -50,19 +48,19 @@ def sleep():
 
 
 def run(playwright, args):
-    email = args.get('--email')
-    if email == '$AMAZON_EMAIL':
-        email = os.environ.get('AMAZON_EMAIL')
+    email = args.get("--email")
+    if email == "$AMAZON_EMAIL":
+        email = os.environ.get("AMAZON_EMAIL")
 
-    password = args.get('--password')
-    if password == '$AMAZON_PASSWORD':
-        password = os.environ.get('AMAZON_PASSWORD')
+    password = args.get("--password")
+    if password == "$AMAZON_PASSWORD":
+        password = os.environ.get("AMAZON_PASSWORD")
 
     # Parse date ranges int start_date and end_date
-    if args['--date-range']:
-        start_date, end_date = args['--date-range'].split('-')
-    elif args['--year'] != "<CUR_YEAR>":
-        start_date, end_date = args['--year'] + "0101", args['--year'] + "1231"
+    if args["--date-range"]:
+        start_date, end_date = args["--date-range"].split("-")
+    elif args["--year"] != "<CUR_YEAR>":
+        start_date, end_date = args["--year"] + "0101", args["--year"] + "1231"
     else:
         year = str(datetime.now().year)
         start_date, end_date = year + "0101", year + "1231"
@@ -84,7 +82,7 @@ def run(playwright, args):
     page.goto("https://www.amazon.com/")
 
     # Sometimes, we are interrupted by a bot check, so let the user solve it
-    page.wait_for_selector('span >> text=Hello, sign in', timeout=0).click()
+    page.wait_for_selector("span >> text=Hello, sign in", timeout=0).click()
 
     if email:
         page.get_by_label("Email").click()
@@ -97,11 +95,11 @@ def run(playwright, args):
         page.get_by_label("Keep me signed in").check()
         page.get_by_role("button", name="Sign in", exact=True).click()
 
-    page.wait_for_selector('a >> text=Returns & Orders', timeout=0).click()
+    page.wait_for_selector("a >> text=Returns & Orders", timeout=0).click()
     sleep()
 
     # Get a list of years from the select options
-    select = page.query_selector('select#time-filter')
+    select = page.query_selector("select#time-filter")
     years = select.inner_text().split("\n")  # skip the first two text options
 
     # Filter years to include only numerical years (YYYY)

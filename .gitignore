@@ -1,3 +1,45 @@
+# Python version management
 .python-version
+
+# Python cache
 __pycache__/
+*.py[cod]
+*$py.class
+
+# Build artifacts
 dist/
+build/
+*.egg-info/
+
+# Node.js dependencies
+node_modules/
+
+# Playwright test artifacts
+/test-results/
+/playwright-report/
+/playwright/.cache/
+
+# Downloads directory
+downloads/
+
+# Environment variables (contains sensitive data)
+.envrc
+.env
+
+# uv specific
+.venv/
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/settings.json
+.vscode/launch.json
+
+# Cache directories
+
+.pytest_cache/
+.coverage
+htmlcov/
+*.bak
+reference
