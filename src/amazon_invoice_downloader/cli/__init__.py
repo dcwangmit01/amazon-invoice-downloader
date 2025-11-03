@@ -7,6 +7,7 @@ Amazon Invoice Downloader
 
 Usage:
   amazon-invoice-downloader.py \
+    [--debug] \
     [--email=<email> --password=<password>] \
     [--year=<YYYY> | --date-range=<YYYYMMDD-YYYYMMDD>]
   amazon-invoice-downloader.py (-h | --help)
@@ -21,6 +22,7 @@ Date Range Options:
   --year=<YYYY>                     Year, formatted as YYYY  [default: <CUR_YEAR>].
 
 Options:
+  --debug                  Show debug messages and keep browser open on error.
   -h --help                Show this screen.
   -v --version             Show version.
 
@@ -51,7 +53,7 @@ from pathlib import Path
 
 from docopt import docopt
 from dotenv import load_dotenv
-from playwright.sync_api import TimeoutError, sync_playwright
+from playwright.sync_api import sync_playwright
 from playwright_stealth import Stealth
 
 from ..__about__ import __version__
@@ -92,6 +94,36 @@ def sleep():
     sleep_time = random.uniform(2, 5)
     # Sleep for the generated time
     time.sleep(sleep_time)
+
+
+def safe_click(page, method_name, *args, **kwargs):
+    """
+    Allow safely clicking an element by passing any method of the page object along with its arguments.
+
+    Examples:
+        safe_click(page, 'query_selector', 'a:has-text("Hello, sign in")')
+        safe_click(page, 'get_by_role', 'button', name="Continue")
+    """
+    # Get the method from the page object
+    method = getattr(page, method_name)
+
+    # Call the method with the provided arguments
+    element = method(*args, **kwargs)
+
+    # Format the call for debugging
+    args_str = ', '.join([repr(arg) for arg in args])
+    kwargs_str = ', '.join([f'{k}={repr(v)}' for k, v in kwargs.items()])
+    all_args = ', '.join(filter(None, [args_str, kwargs_str]))
+
+    print(f"Attempting to click: page.{method_name}({all_args})")
+    try:
+        element.click()
+    except Exception as e:
+        print(f"❌ Failed to click page.{method_name}({all_args}): {e}")
+        if DEBUG_MODE:
+            print(f"🐛 DEBUG: Browser staying open. Press Enter to exit...")
+            input()
+        raise
 
 
 def run(playwright, args):
@@ -170,39 +202,46 @@ def run(playwright, args):
     page.goto("https://amazon.com/")
     page.wait_for_load_state("domcontentloaded")
 
-    # Check if we're on the less fully featured page
-    test_less_featured_page = page.query_selector('a:has-text("Returns & Orders")')
-    if not test_less_featured_page:
-        print("Less featured page detected, navigating to sign-in...")
-        page.query_selector('a:has-text("Your Account")').click()
+    # Check if we're on the continue shopping page
+    test_continue_shopping = page.get_by_role("button", name="Continue shopping")
+    if test_continue_shopping.count() > 0:
+        print("Continue shopping page detected, navigating to main page...")
+        safe_click(page, 'get_by_role', "button", name="Continue shopping")
         page.wait_for_load_state("domcontentloaded")
         sleep()
 
-    page.query_selector('a:has-text("Hello, sign in")').click()
+    # Check if we're on the less fully featured page
+    test_less_featured_page = page.query_selector('a:has-text("Returns & Orders")')
+    if test_less_featured_page is None:
+        print("Less featured page detected, navigating to sign-in...")
+        safe_click(page, 'query_selector', 'a:has-text("Your Account")')
+        page.wait_for_load_state("domcontentloaded")
+        sleep()
+
+    safe_click(page, 'query_selector', 'a:has-text("Hello, sign in")')
     page.wait_for_load_state("domcontentloaded")
     sleep()
 
     if email:
         page.get_by_label("Email").fill(email)
-        page.get_by_role("button", name="Continue").click()
+        safe_click(page, 'get_by_role', "button", name="Continue")
         page.wait_for_load_state("domcontentloaded")
         sleep()
 
     if password:
         page.get_by_label("Password").fill(password)
-        page.get_by_role("button", name="Sign in", exact=True).click()
+        safe_click(page, 'get_by_role', "button", name="Sign in", exact=True)
         page.wait_for_load_state("domcontentloaded")
         sleep()
 
     # Check for 2FA page
-    if page.query_selector('title:has-text("Two-Step Verification")'):
+    if page.title() == "Two-Step Verification":
         print("🔐 2FA detected - please complete authentication in browser")
-        while page.query_selector('title:has-text("Two-Step Verification")'):
-            time.sleep(1)
+        page.wait_for_selector("a >> text=Returns & Orders", timeout=300000)  # 5 minutes
         print("✅ 2FA completed")
     page.wait_for_load_state("domcontentloaded")
 
-    page.wait_for_selector("a >> text=Returns & Orders", timeout=0).click()
+    safe_click(page, 'wait_for_selector', "a >> text=Returns & Orders", timeout=0)
     sleep()
 
     # Get a list of years from the select options
@@ -228,15 +267,15 @@ def run(playwright, args):
         while not done:
             # Go to the next page pagination, and continue downloading
             #   if there is not a next page then break
-            try:
-                if first_page:
-                    first_page = False
+            if first_page:
+                first_page = False
+            else:
+                next_link = page.get_by_role("link", name="Next →")
+                if next_link.is_visible() > 0:
+                    next_link.click()
                 else:
-                    page.get_by_role("link", name="Next →").click()
-                sleep()  # sleep after every page load
-            except TimeoutError:
-                # There are no more pages
-                break
+                    break
+            sleep()  # sleep after every page load
 
             # Order Loop
             order_cards = page.query_selector_all(".order-card.js-order-card")
@@ -278,13 +317,15 @@ def run(playwright, args):
                         margin={"top": ".5in", "right": ".5in", "bottom": ".5in", "left": ".5in"},
                     )
                     invoice_page.close()
-
+    print("✅ Finished downloading invoices")
     # Close the browser
     context.close()
     browser.close()
 
 
 def amazon_invoice_downloader():
+    global DEBUG_MODE
+
     # Load environment variables from .env file if needed
     load_env_if_needed()
 
@@ -293,6 +334,9 @@ def amazon_invoice_downloader():
     if args['--version']:
         print(__version__)
         sys.exit(0)
+
+    # Set debug mode
+    DEBUG_MODE = args.get('--debug', False)
 
     with sync_playwright() as playwright:
         run(playwright, args)
