@@ -1,0 +1,3 @@
+[flake8]
+# Match Black's project-wide line length from pyproject.toml.
+max-line-length = 120

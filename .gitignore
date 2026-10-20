@@ -21,6 +21,12 @@ node_modules/
 
 # Downloads directory
 downloads/
+downloads-*/
+
+# Persistent Amazon session. This contains authenticated browser cookies and
+# must never be committed, copied to cloud storage, or shared.
+.amazon-browser-profile/
+.amazon-browser-profile-*/
 
 # Environment variables (contains sensitive data)
 .envrc
